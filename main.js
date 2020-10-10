@@ -1,6 +1,6 @@
 "use strict";
-const Collision = { Air: 1, Block: 2, };
-const anyCollision = Collision.Air | Collision.Block /*| Collision.Ladder*/;
+const Collision = { Air: 1, Block: 2, Ladder: 4 };
+const anyCollision = Collision.Air | Collision.Block | Collision.Ladder;
 const width = 11;
 function mergeSets(a, b, sets) {
     for (let i = 0; i < sets.length; i++)
@@ -19,16 +19,16 @@ function Field() {
     };
 }
 function canGoUp(field, x, y) {
-    return field.blocks[y][x] == Collision.Air && field.blocks[y + 1][x] == Collision.Air;
+    return field.blocks[y][x] == Collision.Ladder && field.blocks[y + 1][x] == Collision.Ladder;
 }
 function canGoDown(field, x, y) {
-    return field.blocks[y][x] == Collision.Air && field.blocks[y - 1][x] == Collision.Air;
+    return field.blocks[y - 1][x] != Collision.Block;
 }
 function canGoLeft(field, x, y) {
-    return field.blocks[y][x] == Collision.Air && field.blocks[y][x - 1] == Collision.Air;
+    return (field.blocks[y - 1][x] == Collision.Block && field.blocks[y][x] == Collision.Ladder) && field.blocks[y][x - 1] != Collision.Block;
 }
 function canGoRight(field, x, y) {
-    return field.blocks[y][x] == Collision.Air && field.blocks[y][x + 1] == Collision.Air;
+    return (field.blocks[y - 1][x] == Collision.Block && field.blocks[y][x] == Collision.Ladder) && field.blocks[y][x + 1] != Collision.Block;
 }
 function canEnter(field, x, y) {
     return field.blocks[y][x] != Collision.Block;
@@ -75,13 +75,20 @@ function generate(field) {
     }
     pointList.forEach(points => {
         const point = points[Math.floor(Math.random() * points.length)];
-        field.pendingBlocks[0][point] &= Collision.Air;
+        field.pendingBlocks[0][point] &= ~Collision.Block;
     });
     show(field);
 }
 function show(field) {
+    function collisionToString(coll) {
+        switch (coll) {
+            case Collision.Air: return "  ";
+            case Collision.Block: return "[]";
+            case Collision.Ladder: return "|=";
+        }
+    }
     console.log("blocks:");
-    [...field.blocks].reverse().forEach(line => console.log("[]" + line.map(x => x == Collision.Block ? "[]" : "  ").join("") + "[]"));
+    [...field.blocks].reverse().forEach(line => console.log("[]" + line.map(collisionToString).join("") + "[]"));
     console.log("sets:");
     console.log("" + field.sets);
 }

@@ -1,6 +1,6 @@
-const Collision = { Air: 1 as const, Block: 2 as const, /*Ladder: 4 as const*/ };
+const Collision = { Air: 1 as const, Block: 2 as const, Ladder: 4 as const };
 
-const anyCollision = Collision.Air | Collision.Block /*| Collision.Ladder*/;
+const anyCollision = Collision.Air | Collision.Block | Collision.Ladder;
 
 type Collision = typeof Collision[keyof typeof Collision];
 
@@ -35,16 +35,16 @@ function Field(): Field {
 }
 
 function canGoUp(field:Field, x:number, y:number): boolean {
-    return field.blocks[y][x] == Collision.Air && field.blocks[y + 1][x] == Collision.Air;
+    return field.blocks[y][x] == Collision.Ladder && field.blocks[y + 1][x] == Collision.Ladder;
 }
 function canGoDown(field:Field, x:number, y:number): boolean {
-    return field.blocks[y][x] == Collision.Air && field.blocks[y - 1][x] == Collision.Air;
+    return field.blocks[y - 1][x] != Collision.Block;
 }
 function canGoLeft(field:Field, x: number, y: number): boolean {
-    return field.blocks[y][x] == Collision.Air && field.blocks[y][x - 1] == Collision.Air;
+    return (field.blocks[y - 1][x] == Collision.Block && field.blocks[y][x] == Collision.Ladder) && field.blocks[y][x - 1] != Collision.Block;
 }
 function canGoRight(field:Field, x: number, y: number): boolean {
-    return field.blocks[y][x] == Collision.Air && field.blocks[y][x + 1] == Collision.Air;
+    return (field.blocks[y - 1][x] == Collision.Block && field.blocks[y][x] == Collision.Ladder) && field.blocks[y][x + 1] != Collision.Block;
 }
 function canEnter(field: Field, x: number, y:number): boolean {
     return field.blocks[y][x] != Collision.Block;
@@ -88,7 +88,7 @@ function generate(field: Field) {
     }
     pointList.forEach(points => {
         const point = points[Math.floor(Math.random() * points.length)];
-        field.pendingBlocks[0][point] &= Collision.Air;
+        field.pendingBlocks[0][point] &= ~Collision.Block;
     });
 
 
@@ -96,8 +96,15 @@ function generate(field: Field) {
 }
 
 function show(field: Field) {
+    function collisionToString(coll: Collision) {
+        switch(coll) {
+            case Collision.Air: return "  ";
+            case Collision.Block: return "[]";
+            case Collision.Ladder: return "|=";
+        }
+    }
     console.log("blocks:");
-    [...field.blocks].reverse().forEach(line => console.log("[]" + line.map(x => x == Collision.Block ? "[]" : "  ").join("") + "[]"));
+    [...field.blocks].reverse().forEach(line => console.log("[]" + line.map(collisionToString).join("") + "[]"));
 
     console.log("sets:");
     console.log("" + field.sets);
