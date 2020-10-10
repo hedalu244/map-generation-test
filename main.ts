@@ -11,15 +11,15 @@ type PendingBlock = number;
 interface Field {
     pendingBlocks: PendingBlock[][];
     blocks: Block[][];
-    sets: number[]
+    sets: number[];
 }
 
 const width = 11;
 
 function mergeSets(a: number, b: number, sets: number[]) {
     for (let i = 0; i < sets.length; i++)
-        if (sets[i] == a)
-            sets[i] = b;
+        if (sets[i] == b)
+            sets[i] = a;
 }
 
 function Field(): Field {
@@ -30,8 +30,24 @@ function Field(): Field {
         pendingBlocks: [
             new Array(width).fill(0).map(_ => anyCollision)
         ],
-        sets: new Array(width).fill(0).map((_, i) => i)
+        sets: new Array(width).fill(0).map((_, i) => 0)
     };
+}
+
+function canGoUp(field:Field, x:number, y:number): boolean {
+    return field.blocks[y][x] == Collision.Air && field.blocks[y + 1][x] == Collision.Air;
+}
+function canGoDown(field:Field, x:number, y:number): boolean {
+    return field.blocks[y][x] == Collision.Air && field.blocks[y - 1][x] == Collision.Air;
+}
+function canGoLeft(field:Field, x: number, y: number): boolean {
+    return field.blocks[y][x] == Collision.Air && field.blocks[y][x - 1] == Collision.Air;
+}
+function canGoRight(field:Field, x: number, y: number): boolean {
+    return field.blocks[y][x] == Collision.Air && field.blocks[y][x + 1] == Collision.Air;
+}
+function canEnter(field: Field, x: number, y:number): boolean {
+    return field.blocks[y][x] != Collision.Block;
 }
 
 function generate(field: Field) {
@@ -43,36 +59,38 @@ function generate(field: Field) {
     });
     field.pendingBlocks.push(
         new Array(width).fill(0).map((_, i) => anyCollision));
+    field.blocks.push(newLine);
 
+    // 生成されたblocksに合わせてsetsを更新
     // 下から移動して来れない箇所に新しいセットを作る
     let setCount = Math.max(...field.sets);
+    let newSets = [];
     for (let i = 0; i < width; i++) {
-        if (newLine[i] == Collision.Block) { field.sets[i] = 0; continue; }
-        if (newLine[i] != Collision.Air || field.blocks[field.blocks.length - 1][i] != Collision.Air)
-            field.sets[i] = ++setCount;
+        if (!canEnter(field, i, field.blocks.length - 1)) { newSets[i] = 0; continue; }
+        if (canGoUp(field, i, field.blocks.length - 2)) newSets[i] = field.sets[i];
+        else newSets[i] = ++setCount;
     }
-
     // 隣へ移動できるときは同じセットにマージ
     for (let i = 0; i < width - 1; i++) {
-        if (newLine[i] == Collision.Air && newLine[i + 1] == Collision.Air)
-            mergeSets(field.sets[i], field.sets[i + 1], field.sets);
+        if (canGoRight(field, i, field.blocks.length - 1))
+            mergeSets(newSets[i], newSets[i + 1], newSets);
     }
+
+    field.sets = newSets;
 
     // それぞれのセットについて、一箇所は上がairであることを保証する
     let pointList: number[][] = [];
     for (let i = 0; i < width; i++) {
-        if (newLine[i] == Collision.Block) continue;
-        if (pointList[field.sets[i]] === undefined)
-            pointList[field.sets[i]] = [i];
-        else pointList[field.sets[i]].push(i);
+        if (!canEnter(field, i, field.blocks.length - 1)) continue;
+        if (pointList[newSets[i]] === undefined)
+            pointList[newSets[i]] = [i];
+        else pointList[newSets[i]].push(i);
     }
-
     pointList.forEach(points => {
         const point = points[Math.floor(Math.random() * points.length)];
         field.pendingBlocks[0][point] &= Collision.Air;
     });
 
-    field.blocks.push(newLine);
 
     show(field);
 }
@@ -87,7 +105,7 @@ function show(field: Field) {
 
 
 type Vertex = number[];
-type Graph = Vertex[]
+type Graph = Vertex[];
 
 function randomGraph(n: number, rate = 0.3): Vertex[] {
     const cx = 256, cy = 256, r = 200;
@@ -155,8 +173,8 @@ function strengthen(graph: Vertex[]) {
     //各辺を見て、各強連結成分にいくつの入り口と出口があるか数える
     const entranceCount: number[] = new Array(componentCount).fill(0);
     const exitCount: number[] = new Array(componentCount).fill(0);
-    graph.forEach((v, from) => { 
-        v.forEach(to => { 
+    graph.forEach((v, from) => {
+        v.forEach(to => {
             if (component[from] !== component[to]) {
                 exitCount[component[from]]++;
                 entranceCount[component[to]]++;
@@ -174,10 +192,10 @@ function strengthen(graph: Vertex[]) {
         for (let j = 0; j < graph.length; j++)
             if (component[j] === i) members.push(j);
 
-        if (exitCount[i] === 0) 
-                fromList.push([...members]);
-        if (entranceCount[i] === 0) 
-                toList.push([...members]);
+        if (exitCount[i] === 0)
+            fromList.push([...members]);
+        if (entranceCount[i] === 0)
+            toList.push([...members]);
     }
 
     fromList.forEach(x => graph[x[Math.floor(Math.random() * x.length)]].push(graph.length));

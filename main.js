@@ -4,8 +4,8 @@ const anyCollision = Collision.Air | Collision.Block /*| Collision.Ladder*/;
 const width = 11;
 function mergeSets(a, b, sets) {
     for (let i = 0; i < sets.length; i++)
-        if (sets[i] == a)
-            sets[i] = b;
+        if (sets[i] == b)
+            sets[i] = a;
 }
 function Field() {
     return {
@@ -15,8 +15,23 @@ function Field() {
         pendingBlocks: [
             new Array(width).fill(0).map(_ => anyCollision)
         ],
-        sets: new Array(width).fill(0).map((_, i) => i)
+        sets: new Array(width).fill(0).map((_, i) => 0)
     };
+}
+function canGoUp(field, x, y) {
+    return field.blocks[y][x] == Collision.Air && field.blocks[y + 1][x] == Collision.Air;
+}
+function canGoDown(field, x, y) {
+    return field.blocks[y][x] == Collision.Air && field.blocks[y - 1][x] == Collision.Air;
+}
+function canGoLeft(field, x, y) {
+    return field.blocks[y][x] == Collision.Air && field.blocks[y][x - 1] == Collision.Air;
+}
+function canGoRight(field, x, y) {
+    return field.blocks[y][x] == Collision.Air && field.blocks[y][x + 1] == Collision.Air;
+}
+function canEnter(field, x, y) {
+    return field.blocks[y][x] != Collision.Block;
 }
 function generate(field) {
     //自由にしていいブロックを勝手に決める
@@ -27,36 +42,41 @@ function generate(field) {
         return candidate[Math.floor(Math.random() * candidate.length)];
     });
     field.pendingBlocks.push(new Array(width).fill(0).map((_, i) => anyCollision));
+    field.blocks.push(newLine);
+    // 生成されたblocksに合わせてsetsを更新
     // 下から移動して来れない箇所に新しいセットを作る
     let setCount = Math.max(...field.sets);
+    let newSets = [];
     for (let i = 0; i < width; i++) {
-        if (newLine[i] == Collision.Block) {
-            field.sets[i] = 0;
+        if (!canEnter(field, i, field.blocks.length - 1)) {
+            newSets[i] = 0;
             continue;
         }
-        if (newLine[i] != Collision.Air || field.blocks[field.blocks.length - 1][i] != Collision.Air)
-            field.sets[i] = ++setCount;
+        if (canGoUp(field, i, field.blocks.length - 2))
+            newSets[i] = field.sets[i];
+        else
+            newSets[i] = ++setCount;
     }
     // 隣へ移動できるときは同じセットにマージ
     for (let i = 0; i < width - 1; i++) {
-        if (newLine[i] == Collision.Air && newLine[i + 1] == Collision.Air)
-            mergeSets(field.sets[i], field.sets[i + 1], field.sets);
+        if (canGoRight(field, i, field.blocks.length - 1))
+            mergeSets(newSets[i], newSets[i + 1], newSets);
     }
+    field.sets = newSets;
     // それぞれのセットについて、一箇所は上がairであることを保証する
     let pointList = [];
     for (let i = 0; i < width; i++) {
-        if (newLine[i] == Collision.Block)
+        if (!canEnter(field, i, field.blocks.length - 1))
             continue;
-        if (pointList[field.sets[i]] === undefined)
-            pointList[field.sets[i]] = [i];
+        if (pointList[newSets[i]] === undefined)
+            pointList[newSets[i]] = [i];
         else
-            pointList[field.sets[i]].push(i);
+            pointList[newSets[i]].push(i);
     }
     pointList.forEach(points => {
         const point = points[Math.floor(Math.random() * points.length)];
         field.pendingBlocks[0][point] &= Collision.Air;
     });
-    field.blocks.push(newLine);
     show(field);
 }
 function show(field) {
