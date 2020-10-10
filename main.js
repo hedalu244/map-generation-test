@@ -10,6 +10,7 @@ function mergeSets(a, b, sets) {
 function Field() {
     return {
         blocks: [
+            new Array(width).fill(0).map(_ => Collision.Block),
             new Array(width).fill(0).map(_ => Collision.Block)
         ],
         pendingBlocks: [
@@ -25,10 +26,16 @@ function canGoDown(field, x, y) {
     return field.blocks[y - 1][x] != Collision.Block;
 }
 function canGoLeft(field, x, y) {
-    return (field.blocks[y - 1][x] == Collision.Block && field.blocks[y][x] == Collision.Ladder) && field.blocks[y][x - 1] != Collision.Block;
+    return (field.blocks[y - 1][x] == Collision.Block || field.blocks[y][x] == Collision.Ladder) && canEnter(field, x - 1, y);
 }
 function canGoRight(field, x, y) {
-    return (field.blocks[y - 1][x] == Collision.Block && field.blocks[y][x] == Collision.Ladder) && field.blocks[y][x + 1] != Collision.Block;
+    return (field.blocks[y - 1][x] == Collision.Block || field.blocks[y][x] == Collision.Ladder) && canEnter(field, x + 1, y);
+}
+function canGoLeftUp(field, x, y) {
+    return (field.blocks[y - 1][x] == Collision.Block && field.blocks[y][x] == Collision.Ladder) && field.blocks[y][x - 1] == Collision.Block && canEnter(field, x, y + 1) && canEnter(field, x - 1, y + 1);
+}
+function canGoRightUp(field, x, y) {
+    return (field.blocks[y - 1][x] == Collision.Block && field.blocks[y][x] == Collision.Ladder) && field.blocks[y][x + 1] == Collision.Block && canEnter(field, x, y + 1) && canEnter(field, x + 1, y + 1);
 }
 function canEnter(field, x, y) {
     return field.blocks[y][x] != Collision.Block;
@@ -52,10 +59,10 @@ function generate(field) {
             continue;
         if (canGoUp(field, i, field.blocks.length - 2))
             newGraph[i + width].push(i);
-        if (canGoDown(field, i, field.blocks.length - 2))
+        if (canGoDown(field, i, field.blocks.length - 1))
             newGraph[i].push(i + width);
     }
-    // 左右移動を繋ぐ
+    // 左右、斜め移動を繋ぐ
     for (let i = 0; i < width - 1; i++) {
         if (!canEnter(field, i, field.blocks.length - 1))
             continue;
@@ -63,6 +70,10 @@ function generate(field) {
             newGraph[i].push(i + 1);
         if (canGoLeft(field, i + 1, field.blocks.length - 1))
             newGraph[i + 1].push(i);
+        if (canGoRightUp(field, i, field.blocks.length - 2))
+            newGraph[i + width].push(i + 1);
+        if (canGoLeftUp(field, i + 1, field.blocks.length - 2))
+            newGraph[i + 1 + width].push(i);
     }
     // 推移閉包を取った上で、後ろに入れておいた古い頂点を落とす
     field.graph = dropGraph(transclosure(newGraph), width);

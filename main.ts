@@ -25,6 +25,7 @@ function mergeSets(a: number, b: number, sets: number[]) {
 function Field(): Field {
     return {
         blocks: [
+            new Array(width).fill(0).map(_ => Collision.Block),
             new Array(width).fill(0).map(_ => Collision.Block)
         ],
         pendingBlocks: [
@@ -42,10 +43,16 @@ function canGoDown(field: Field, x: number, y: number): boolean {
     return field.blocks[y - 1][x] != Collision.Block;
 }
 function canGoLeft(field: Field, x: number, y: number): boolean {
-    return (field.blocks[y - 1][x] == Collision.Block && field.blocks[y][x] == Collision.Ladder) && field.blocks[y][x - 1] != Collision.Block;
+    return (field.blocks[y - 1][x] == Collision.Block || field.blocks[y][x] == Collision.Ladder) && canEnter(field, x - 1, y);
 }
 function canGoRight(field: Field, x: number, y: number): boolean {
-    return (field.blocks[y - 1][x] == Collision.Block && field.blocks[y][x] == Collision.Ladder) && field.blocks[y][x + 1] != Collision.Block;
+    return (field.blocks[y - 1][x] == Collision.Block || field.blocks[y][x] == Collision.Ladder) && canEnter(field, x + 1, y);
+}
+function canGoLeftUp(field: Field, x: number, y: number): boolean {
+    return (field.blocks[y - 1][x] == Collision.Block && field.blocks[y][x] == Collision.Ladder) && field.blocks[y][x - 1] == Collision.Block && canEnter(field, x, y + 1) && canEnter(field, x - 1, y + 1);
+}
+function canGoRightUp(field: Field, x: number, y: number): boolean {
+    return (field.blocks[y - 1][x] == Collision.Block && field.blocks[y][x] == Collision.Ladder) && field.blocks[y][x + 1] == Collision.Block && canEnter(field, x, y + 1) && canEnter(field, x + 1, y + 1);
 }
 function canEnter(field: Field, x: number, y: number): boolean {
     return field.blocks[y][x] != Collision.Block;
@@ -69,13 +76,15 @@ function generate(field: Field) {
     for (let i = 0; i < width; i++) {
         if (!canEnter(field, i, field.blocks.length - 1)) continue;
         if (canGoUp(field, i, field.blocks.length - 2)) newGraph[i + width].push(i);
-        if (canGoDown(field, i, field.blocks.length - 2)) newGraph[i].push(i + width);
+        if (canGoDown(field, i, field.blocks.length - 1)) newGraph[i].push(i + width);
     }
-    // 左右移動を繋ぐ
+    // 左右、斜め移動を繋ぐ
     for (let i = 0; i < width - 1; i++) {
         if (!canEnter(field, i, field.blocks.length - 1)) continue;
         if (canGoRight(field, i, field.blocks.length - 1)) newGraph[i].push(i + 1);
         if (canGoLeft(field, i + 1, field.blocks.length - 1)) newGraph[i + 1].push(i);
+        if (canGoRightUp(field, i, field.blocks.length - 2)) newGraph[i + width].push(i + 1);
+        if (canGoLeftUp(field, i + 1, field.blocks.length - 2)) newGraph[i + 1 + width].push(i);
     }
 
     // 推移閉包を取った上で、後ろに入れておいた古い頂点を落とす
@@ -86,14 +95,14 @@ function generate(field: Field) {
     // 入口と出口をいい感じに配置する。失敗したら一手戻ってやり直し
     entranceList.forEach(points => {
         const point = points[Math.floor(Math.random() * points.length)];
-        
+
         //上がブロックでなければ入り口になる
         field.pendingBlocks[0][point] &= ~Collision.Block;
     });
     exitList.forEach(points => {
         const point = points[Math.floor(Math.random() * points.length)];
         //上に梯子を作れば出口になる
-        if(field.blocks[field.blocks.length - 1][point] == Collision.Ladder) 
+        if (field.blocks[field.blocks.length - 1][point] == Collision.Ladder)
             field.pendingBlocks[0][point] &= Collision.Ladder;
         //斜め上に足場を作れば出口になる
         else if (1 < point) field.pendingBlocks[0][point - 1] &= ~Collision.Block;
