@@ -10,12 +10,12 @@ function mergeSets(a, b, sets) {
 function Field() {
     return {
         blocks: [
-            new Array(width).fill(0).map((_, i) => Collision.Block)
+            new Array(width).fill(0).map(_ => Collision.Block)
         ],
         pendingBlocks: [
-            new Array(width).fill(0).map((_, i) => anyCollision)
+            new Array(width).fill(0).map(_ => anyCollision)
         ],
-        sets: new Array(width).fill(0)
+        sets: new Array(width).fill(0).map((_, i) => i)
     };
 }
 function generate(field) {
@@ -27,7 +27,7 @@ function generate(field) {
         return candidate[Math.floor(Math.random() * candidate.length)];
     });
     field.pendingBlocks.push(new Array(width).fill(0).map((_, i) => anyCollision));
-    // 上から移動して来れない箇所に新しいセットを作る
+    // 下から移動して来れない箇所に新しいセットを作る
     let setCount = Math.max(...field.sets);
     for (let i = 0; i < width; i++) {
         if (newLine[i] == Collision.Block) {
@@ -42,7 +42,7 @@ function generate(field) {
         if (newLine[i] == Collision.Air && newLine[i + 1] == Collision.Air)
             mergeSets(field.sets[i], field.sets[i + 1], field.sets);
     }
-    // それぞれのセットについて、一箇所は下がairであることを保証する
+    // それぞれのセットについて、一箇所は上がairであることを保証する
     let pointList = [];
     for (let i = 0; i < width; i++) {
         if (newLine[i] == Collision.Block)

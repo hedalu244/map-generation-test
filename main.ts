@@ -11,7 +11,7 @@ type PendingBlock = number;
 interface Field {
     pendingBlocks: PendingBlock[][];
     blocks: Block[][];
-    sets: number[];
+    sets: number[]
 }
 
 const width = 11;
@@ -25,12 +25,12 @@ function mergeSets(a: number, b: number, sets: number[]) {
 function Field(): Field {
     return {
         blocks: [
-            new Array(width).fill(0).map((_, i) => Collision.Block)
+            new Array(width).fill(0).map(_ => Collision.Block)
         ],
         pendingBlocks: [
-            new Array(width).fill(0).map((_, i) => anyCollision)
+            new Array(width).fill(0).map(_ => anyCollision)
         ],
-        sets: new Array(width).fill(0)
+        sets: new Array(width).fill(0).map((_, i) => i)
     };
 }
 
@@ -44,7 +44,7 @@ function generate(field: Field) {
     field.pendingBlocks.push(
         new Array(width).fill(0).map((_, i) => anyCollision));
 
-    // 上から移動して来れない箇所に新しいセットを作る
+    // 下から移動して来れない箇所に新しいセットを作る
     let setCount = Math.max(...field.sets);
     for (let i = 0; i < width; i++) {
         if (newLine[i] == Collision.Block) { field.sets[i] = 0; continue; }
@@ -58,7 +58,7 @@ function generate(field: Field) {
             mergeSets(field.sets[i], field.sets[i + 1], field.sets);
     }
 
-    // それぞれのセットについて、一箇所は下がairであることを保証する
+    // それぞれのセットについて、一箇所は上がairであることを保証する
     let pointList: number[][] = [];
     for (let i = 0; i < width; i++) {
         if (newLine[i] == Collision.Block) continue;
@@ -87,6 +87,7 @@ function show(field: Field) {
 
 
 type Vertex = number[];
+type Graph = Vertex[]
 
 function randomGraph(n: number, rate = 0.3): Vertex[] {
     const cx = 256, cy = 256, r = 200;
