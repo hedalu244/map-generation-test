@@ -1,6 +1,8 @@
-const Collision = { Block: 2 as const, Air: 1 as const };
+const Collision = { Air: 1 as const, Block: 2 as const, /*Ladder: 4 as const*/ };
 
-type Collision = typeof Collision[keyof typeof Collision]
+const anyCollision = Collision.Air | Collision.Block /*| Collision.Ladder*/;
+
+type Collision = typeof Collision[keyof typeof Collision];
 
 type Block = Collision;
 
@@ -26,9 +28,9 @@ function Field(): Field {
             new Array(width).fill(0).map((_, i) => Collision.Block)
         ],
         pendingBlocks: [
-            new Array(width).fill(0).map((_, i) => Collision.Block | Collision.Air)
+            new Array(width).fill(0).map((_, i) => anyCollision)
         ],
-        sets: new Array(width).fill(0).map((_, i) => i)
+        sets: new Array(width).fill(0)
     };
 }
 
@@ -40,11 +42,12 @@ function generate(field: Field) {
         return candidate[Math.floor(Math.random() * candidate.length)];
     });
     field.pendingBlocks.push(
-        new Array(width).fill(0).map((_, i) => Collision.Block | Collision.Air));
+        new Array(width).fill(0).map((_, i) => anyCollision));
 
     // 上から移動して来れない箇所に新しいセットを作る
     let setCount = Math.max(...field.sets);
     for (let i = 0; i < width; i++) {
+        if (newLine[i] == Collision.Block) { field.sets[i] = 0; continue; }
         if (newLine[i] != Collision.Air || field.blocks[field.blocks.length - 1][i] != Collision.Air)
             field.sets[i] = ++setCount;
     }
@@ -55,7 +58,7 @@ function generate(field: Field) {
             mergeSets(field.sets[i], field.sets[i + 1], field.sets);
     }
 
-    // それぞれのセットについて、少なくとも一箇所は下をairにする
+    // それぞれのセットについて、一箇所は下がairであることを保証する
     let pointList: number[][] = [];
     for (let i = 0; i < width; i++) {
         if (newLine[i] == Collision.Block) continue;
@@ -65,22 +68,19 @@ function generate(field: Field) {
     }
 
     pointList.forEach(points => {
-        let num = 1 + Math.floor(Math.random() * (points.length - 1));
-        for(let i = 0; i < num; i++) {
-            const point = points[Math.floor(Math.random() * points.length)];
-            field.pendingBlocks[0][point] &= Collision.Air;
-        }
+        const point = points[Math.floor(Math.random() * points.length)];
+        field.pendingBlocks[0][point] &= Collision.Air;
     });
 
     field.blocks.push(newLine);
 
-    show(field)
+    show(field);
 }
 
 function show(field: Field) {
     console.log("blocks:");
-    field.blocks.forEach(line => console.log("[]" + line.map(x=> x==Collision.Block ? "[]" : "  ").join("") + "[]"));
-    
+    [...field.blocks].reverse().forEach(line => console.log("[]" + line.map(x => x == Collision.Block ? "[]" : "  ").join("") + "[]"));
+
     console.log("sets:");
     console.log("" + field.sets);
 }
