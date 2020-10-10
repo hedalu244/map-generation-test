@@ -1,51 +1,88 @@
 "use strict";
-function draw(graph) {
-    const canvas = document.getElementById("canvas");
-    if (!(canvas instanceof HTMLCanvasElement))
-        throw new Error();
-    const context = canvas.getContext("2d");
-    if (context === null)
-        throw new Error();
-    context.clearRect(0, 0, context.canvas.width, context.canvas.height);
-    graph.forEach(vertex => {
-        context.fillRect(vertex.pos.x, vertex.pos.y, 3, 3);
-        vertex.next.forEach(i => {
-            const next = graph[i];
-            const length = Math.sqrt((next.pos.x - vertex.pos.x) * (next.pos.x - vertex.pos.x) +
-                (next.pos.y - vertex.pos.y) * (next.pos.y - vertex.pos.y));
-            const dirx = (next.pos.x - vertex.pos.x) / length;
-            const diry = (next.pos.y - vertex.pos.y) / length;
-            context.beginPath();
-            context.moveTo(vertex.pos.x + 0.05 * (next.pos.x - vertex.pos.x), vertex.pos.y + 0.05 * (next.pos.y - vertex.pos.y));
-            context.lineTo(vertex.pos.x + 0.95 * (next.pos.x - vertex.pos.x), vertex.pos.y + 0.95 * (next.pos.y - vertex.pos.y));
-            context.stroke();
-            context.beginPath();
-            context.moveTo(vertex.pos.x + 0.95 * (next.pos.x - vertex.pos.x), vertex.pos.y + 0.95 * (next.pos.y - vertex.pos.y));
-            context.lineTo(vertex.pos.x + 0.95 * (next.pos.x - vertex.pos.x) + (-0.87 * dirx + 0.5 * diry) * 10, vertex.pos.y + 0.95 * (next.pos.y - vertex.pos.y) + (-0.5 * dirx - 0.87 * diry) * 10);
-            context.lineTo(vertex.pos.x + 0.95 * (next.pos.x - vertex.pos.x) + (-0.87 * dirx - 0.5 * diry) * 10, vertex.pos.y + 0.95 * (next.pos.y - vertex.pos.y) + (0.5 * dirx - 0.87 * diry) * 10);
-            context.closePath();
-            context.fill();
-        });
+const Collision = { Air: 1, Block: 2, };
+const anyCollision = Collision.Air | Collision.Block /*| Collision.Ladder*/;
+const width = 11;
+function mergeSets(a, b, sets) {
+    for (let i = 0; i < sets.length; i++)
+        if (sets[i] == a)
+            sets[i] = b;
+}
+function Field() {
+    return {
+        blocks: [
+            new Array(width).fill(0).map((_, i) => Collision.Block)
+        ],
+        pendingBlocks: [
+            new Array(width).fill(0).map((_, i) => anyCollision)
+        ],
+        sets: new Array(width).fill(0)
+    };
+}
+function generate(field) {
+    //自由にしていいブロックを勝手に決める
+    let newLine = field.pendingBlocks.shift().map(pending => {
+        if (pending === 0)
+            throw new Error();
+        let candidate = (Object.values(Collision).filter(coll => pending & coll));
+        return candidate[Math.floor(Math.random() * candidate.length)];
     });
+    field.pendingBlocks.push(new Array(width).fill(0).map((_, i) => anyCollision));
+    // 上から移動して来れない箇所に新しいセットを作る
+    let setCount = Math.max(...field.sets);
+    for (let i = 0; i < width; i++) {
+        if (newLine[i] == Collision.Block) {
+            field.sets[i] = 0;
+            continue;
+        }
+        if (newLine[i] != Collision.Air || field.blocks[field.blocks.length - 1][i] != Collision.Air)
+            field.sets[i] = ++setCount;
+    }
+    // 隣へ移動できるときは同じセットにマージ
+    for (let i = 0; i < width - 1; i++) {
+        if (newLine[i] == Collision.Air && newLine[i + 1] == Collision.Air)
+            mergeSets(field.sets[i], field.sets[i + 1], field.sets);
+    }
+    // それぞれのセットについて、一箇所は下がairであることを保証する
+    let pointList = [];
+    for (let i = 0; i < width; i++) {
+        if (newLine[i] == Collision.Block)
+            continue;
+        if (pointList[field.sets[i]] === undefined)
+            pointList[field.sets[i]] = [i];
+        else
+            pointList[field.sets[i]].push(i);
+    }
+    pointList.forEach(points => {
+        const point = points[Math.floor(Math.random() * points.length)];
+        field.pendingBlocks[0][point] &= Collision.Air;
+    });
+    field.blocks.push(newLine);
+    show(field);
+}
+function show(field) {
+    console.log("blocks:");
+    [...field.blocks].reverse().forEach(line => console.log("[]" + line.map(x => x == Collision.Block ? "[]" : "  ").join("") + "[]"));
+    console.log("sets:");
+    console.log("" + field.sets);
 }
 function randomGraph(n, rate = 0.3) {
     const cx = 256, cy = 256, r = 200;
     let graph = [];
     for (let i = 0; i < n; i++)
-        graph.push({ pos: { x: cx + r * Math.cos(2 * i * Math.PI / n), y: cy + r * Math.sin(2 * i * Math.PI / n) }, next: [] });
+        graph.push([]);
     for (let i = 0; i < n; i++)
         for (let j = 0; j < n; j++)
             if (Math.random() < rate)
-                graph[i].next.push(j);
+                graph[i].push(j);
     return graph;
 }
 function reverse(graph) {
     const reversed = [];
     graph.forEach((vertex) => {
-        reversed.push(Object.assign(Object.assign({}, vertex), { next: [] }));
+        reversed.push([]);
     });
     graph.forEach((vertex, i) => {
-        vertex.next.forEach(j => reversed[j].next.push(i));
+        vertex.forEach(j => reversed[j].push(i));
     });
     return reversed;
 }
@@ -63,7 +100,7 @@ function strongComponents(graph) {
             if (visited[now] !== 0)
                 return;
             visited[now] = 1;
-            graph[now].next.forEach(x => dfs1(x));
+            graph[now].forEach(x => dfs1(x));
             log.unshift(now);
         }
         dfs1(i);
@@ -72,7 +109,7 @@ function strongComponents(graph) {
                 return;
             visited[now] = 2;
             component[now] = componentCount;
-            reversed[now].next.forEach(x => dfs2(x));
+            reversed[now].forEach(x => dfs2(x));
         }
         for (var j = 0; j < log.length; j++) {
             if (visited[log[j]] !== 1)
@@ -90,7 +127,7 @@ function strengthen(graph) {
     const entranceCount = new Array(componentCount).fill(0);
     const exitCount = new Array(componentCount).fill(0);
     graph.forEach((v, from) => {
-        v.next.forEach(to => {
+        v.forEach(to => {
             if (component[from] !== component[to]) {
                 exitCount[component[from]]++;
                 entranceCount[component[to]]++;
@@ -112,7 +149,7 @@ function strengthen(graph) {
         if (entranceCount[i] === 0)
             toList.push([...members]);
     }
-    fromList.forEach(x => graph[x[Math.floor(Math.random() * x.length)]].next.push(graph.length));
-    graph.push({ next: [], pos: { x: 256, y: 256 } });
-    toList.forEach(x => graph[graph.length - 1].next.push(x[Math.floor(Math.random() * x.length)]));
+    fromList.forEach(x => graph[x[Math.floor(Math.random() * x.length)]].push(graph.length));
+    graph.push([]);
+    toList.forEach(x => graph[graph.length - 1].push(x[Math.floor(Math.random() * x.length)]));
 }
