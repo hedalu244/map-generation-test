@@ -76,14 +76,9 @@ function reverse(graph: Vertex[]) {
 }
 
 function strongComponents(graph: Vertex[]) {
-    
-    // 辺の向きが逆転したグラフ
     const reversed = reverse(graph);
-    // 到達した履歴（未到達:0, 正順で到達:1, 逆順でも到達:2）
     const visited = new Array(graph.length).fill(0);
-    // それぞれの頂点がどの強連結成分に属すか
     const component: number[] = new Array(graph.length);
-    //強連結成分のカウント
     let componentCount = 0;
 
     //強連結成分分解
@@ -110,13 +105,12 @@ function strongComponents(graph: Vertex[]) {
             componentCount++;
         }
     }
-    return component;
+    return [component, componentCount] as const;
 }
 
 // グラフに頂点を追加して強連結にする
 function strengthen(graph: Vertex[]) {
-    const component = strongComponents(graph);
-    const componentCount = Math.max(...component) + 1;
+    const [component, componentCount] = strongComponents(graph);
 
     //各辺を見て、各強連結成分にいくつの入り口と出口があるか数える
     const entranceCount: number[] = new Array(componentCount).fill(0);
@@ -132,21 +126,20 @@ function strengthen(graph: Vertex[]) {
 
     const toList = [];
     const fromList = [];
-    //入り口のない強連結成分のどこかへ行けるようにする
+    //入り口のない強連結成分、出口のない成分のメンバーを成分ごとに分けてリストアップする
     for (let i = 0; i < componentCount; i++) {
-        if (exitCount[i] === 0) {
-            const members = [];
-            for (let j = 0; j < graph.length; j++)
-                if (component[j] === i) members.push(j);
-                fromList.push(members);
-        }
-        if (entranceCount[i] === 0) {
-            const members = [];
-            for (let j = 0; j < graph.length; j++)
-                if (component[j] === i) members.push(j);
-                toList.push(members);
-        }
+        if (exitCount[i] !== 0 && entranceCount[i] !== 0) continue;
+
+        const members = [];
+        for (let j = 0; j < graph.length; j++)
+            if (component[j] === i) members.push(j);
+
+        if (exitCount[i] === 0) 
+                fromList.push([...members]);
+        if (entranceCount[i] === 0) 
+                toList.push([...members]);
     }
+
     fromList.forEach(x => graph[x[Math.floor(Math.random() * x.length)]].next.push(graph.length));
     graph.push({ next: [], pos: { x: 256, y: 256 } });
     toList.forEach(x => graph[graph.length - 1].next.push(x[Math.floor(Math.random() * x.length)]));
