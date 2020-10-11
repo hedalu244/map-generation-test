@@ -20,25 +20,28 @@ function Field() {
     };
 }
 function canGoUp(field, x, y) {
-    return field.blocks[y + 1][x] == Collision.Ladder;
+    return canStand(field, x, y) && field.blocks[y + 1][x] == Collision.Ladder;
 }
 function canGoDown(field, x, y) {
     return field.blocks[y - 1][x] != Collision.Block;
 }
 function canGoLeft(field, x, y) {
-    return (field.blocks[y - 1][x] == Collision.Block || field.blocks[y][x] == Collision.Ladder) && canEnter(field, x - 1, y);
+    return canStand(field, x, y) && canEnter(field, x - 1, y);
 }
 function canGoRight(field, x, y) {
-    return (field.blocks[y - 1][x] == Collision.Block || field.blocks[y][x] == Collision.Ladder) && canEnter(field, x + 1, y);
+    return canStand(field, x, y) && canEnter(field, x + 1, y);
 }
 function canGoLeftUp(field, x, y) {
-    return (field.blocks[y - 1][x] == Collision.Block && field.blocks[y][x] == Collision.Ladder) && field.blocks[y][x - 1] == Collision.Block && canEnter(field, x, y + 1) && canEnter(field, x - 1, y + 1);
+    return canStand(field, x, y) && field.blocks[y][x - 1] == Collision.Block && canEnter(field, x, y + 1) && canEnter(field, x - 1, y + 1);
 }
 function canGoRightUp(field, x, y) {
-    return (field.blocks[y - 1][x] == Collision.Block && field.blocks[y][x] == Collision.Ladder) && field.blocks[y][x + 1] == Collision.Block && canEnter(field, x, y + 1) && canEnter(field, x + 1, y + 1);
+    return canStand(field, x, y) && field.blocks[y][x + 1] == Collision.Block && canEnter(field, x, y + 1) && canEnter(field, x + 1, y + 1);
 }
 function canEnter(field, x, y) {
     return field.blocks[y][x] != Collision.Block;
+}
+function canStand(field, x, y) {
+    return (field.blocks[y - 1][x] == Collision.Block || field.blocks[y][x] == Collision.Ladder);
 }
 function putCollisionPattern(pendingBlocks, pattern, offsetX) {
     return pendingBlocks.map((row, y) => row.map((a, x) => {
@@ -66,23 +69,25 @@ function generate(field) {
     for (let i = 0; i < width; i++) {
         if (!canEnter(field, i, field.blocks.length - 1))
             continue;
-        if (canGoUp(field, i, field.blocks.length - 2))
+        if (canGoUp(field, i, field.blocks.length - 2) || !canStand(field, i, field.blocks.length - 1))
             newGraph[i + width].push(i);
         if (canGoDown(field, i, field.blocks.length - 1))
             newGraph[i].push(i + width);
     }
     // 左右、斜め移動を繋ぐ
     for (let i = 0; i < width - 1; i++) {
-        if (!canEnter(field, i, field.blocks.length - 1))
-            continue;
-        if (canGoRight(field, i, field.blocks.length - 1))
-            newGraph[i].push(i + 1);
-        if (canGoLeft(field, i + 1, field.blocks.length - 1))
-            newGraph[i + 1].push(i);
-        if (canGoRightUp(field, i, field.blocks.length - 2))
-            newGraph[i + width].push(i + 1);
-        if (canGoLeftUp(field, i + 1, field.blocks.length - 2))
-            newGraph[i + 1 + width].push(i);
+        if (canEnter(field, i, field.blocks.length - 1)) {
+            if (canGoRight(field, i, field.blocks.length - 1))
+                newGraph[i].push(i + 1);
+            if (canGoRightUp(field, i, field.blocks.length - 2))
+                newGraph[i + width].push(i + 1);
+        }
+        if (canEnter(field, i + 1, field.blocks.length - 1)) {
+            if (canGoLeft(field, i + 1, field.blocks.length - 1))
+                newGraph[i + 1].push(i);
+            if (canGoLeftUp(field, i + 1, field.blocks.length - 2))
+                newGraph[i + 1 + width].push(i);
+        }
     }
     // 推移閉包を取った上で、後ろに入れておいた古い頂点を落とす
     field.graph = dropGraph(transclosure(newGraph), width);
@@ -93,6 +98,9 @@ function generate(field) {
         ...entranceList.map(points => {
             let list = [];
             points.forEach(x => {
+                // 立ち入れない点は孤立点だが出口を作る必要はない
+                if (!canEnter(field, x, field.blocks.length - 1))
+                    return;
                 //上がブロックでなければ入り口になる
                 list.push({ pattern: [[~Collision.Block]], offsetX: x });
             });
@@ -101,8 +109,12 @@ function generate(field) {
         ...exitList.map(points => {
             let list = [];
             points.forEach(x => {
+                // 立ち入れない点は孤立点だが出口を作る必要はない
+                if (!canEnter(field, x, field.blocks.length - 1))
+                    return;
                 //上に梯子を作れば出口になる
-                list.push({ pattern: [[Collision.Ladder]], offsetX: x });
+                if (canStand(field, x, field.blocks.length - 1))
+                    list.push({ pattern: [[Collision.Ladder]], offsetX: x });
                 //隣がブロックなら斜め上に立ち位置を作れば出口になる
                 if (field.blocks[field.blocks.length - 1][x - 1] == Collision.Block)
                     list.push({ pattern: [[~Collision.Block, ~Collision.Block]], offsetX: x - 1 });
@@ -111,7 +123,7 @@ function generate(field) {
             });
             return list;
         }),
-    ].map(x => shuffle(x));
+    ].filter(x => 0 < x.length).map(x => shuffle(x));
     function shuffle(array) {
         for (let i = 0; i < array.length; i++) {
             const j = i + Math.floor(Math.random() * (array.length - i));
@@ -146,6 +158,19 @@ function generate(field) {
         throw new Error();
     }
     field.pendingBlocks = rec(field.pendingBlocks, patternList);
+    console.log(field.graph);
+    let entranceIds = new Array(width).fill("  ");
+    entranceList.forEach((a, i) => a.forEach(x => { if (canEnter(field, x, field.blocks.length - 1))
+        entranceIds[x] = i < 10 ? " " + i : "" + i; }));
+    console.log("entrance↓");
+    console.log(entranceList);
+    console.log("  " + entranceIds.join(""));
+    let exitIds = new Array(width).fill("  ");
+    exitList.forEach((a, i) => a.forEach(x => { if (canEnter(field, x, field.blocks.length - 1))
+        exitIds[x] = i < 10 ? " " + i : "" + i; }));
+    console.log("exit↑");
+    console.log(exitList);
+    console.log("  " + exitIds.join(""));
     show(field);
 }
 function show(field) {
