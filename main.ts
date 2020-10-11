@@ -37,22 +37,22 @@ function Field(): Field {
 
 
 function canGoUp(field: Field, x: number, y: number): boolean {
-    return canStand(field, x, y) && field.blocks[y + 1][x] == Collision.Ladder;
+    return canEnter(field, x, y) && canStand(field, x, y) && field.blocks[y + 1][x] == Collision.Ladder;
 }
 function canGoDown(field: Field, x: number, y: number): boolean {
-    return field.blocks[y - 1][x] != Collision.Block;
+    return canEnter(field, x, y) && field.blocks[y - 1][x] != Collision.Block;
 }
 function canGoLeft(field: Field, x: number, y: number): boolean {
-    return canStand(field, x, y) && canEnter(field, x - 1, y);
+    return canEnter(field, x, y) && canStand(field, x, y) && canEnter(field, x - 1, y);
 }
 function canGoRight(field: Field, x: number, y: number): boolean {
-    return canStand(field, x, y) && canEnter(field, x + 1, y);
+    return canEnter(field, x, y) && canStand(field, x, y) && canEnter(field, x + 1, y);
 }
 function canGoLeftUp(field: Field, x: number, y: number): boolean {
-    return canStand(field, x, y) && field.blocks[y][x - 1] == Collision.Block && canEnter(field, x, y + 1) && canEnter(field, x - 1, y + 1);
+    return canEnter(field, x, y) && canStand(field, x, y) && field.blocks[y][x - 1] == Collision.Block && canEnter(field, x, y + 1) && canEnter(field, x - 1, y + 1);
 }
 function canGoRightUp(field: Field, x: number, y: number): boolean {
-    return canStand(field, x, y) && field.blocks[y][x + 1] == Collision.Block && canEnter(field, x, y + 1) && canEnter(field, x + 1, y + 1);
+    return canEnter(field, x, y) && canStand(field, x, y) && field.blocks[y][x + 1] == Collision.Block && canEnter(field, x, y + 1) && canEnter(field, x + 1, y + 1);
 }
 function canEnter(field: Field, x: number, y: number): boolean {
     return field.blocks[y][x] != Collision.Block;
@@ -126,9 +126,10 @@ function generate(field: Field) {
                 // 立ち入れない点は孤立点だが出口を作る必要はない
                 if (!canEnter(field, x, field.blocks.length - 1)) return;
 
+                if (!canStand(field, x, field.blocks.length - 1)) return;
+
                 //上に梯子を作れば出口になる
-                if (canStand(field, x, field.blocks.length - 1))
-                    list.push({ pattern: [[Collision.Ladder]], offsetX: x });
+                list.push({ pattern: [[Collision.Ladder]], offsetX: x });
 
                 //隣がブロックなら斜め上に立ち位置を作れば出口になる
                 if (field.blocks[field.blocks.length - 1][x - 1] == Collision.Block)
