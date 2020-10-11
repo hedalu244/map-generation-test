@@ -104,28 +104,33 @@ function generate(field: Field) {
 
     // 入り口出口のパターンを列挙（二次元配列の各行から一つずつ選べればOK）
     let patternList = [
-        ...entranceList.map(points => points.map(x => {
-            //上がブロックでなければ入り口になる
-            return { pattern: [[~Collision.Block]], offsetX: x };
-        })),
-        ...exitList.map(points => ([] as { pattern: number[][], offsetX: number; }[]).concat(...points.map(x => {
-            //上がブロックでなければ入り口になる
+        ...entranceList.map(points => {
             let list: { pattern: number[][], offsetX: number; }[] = [];
-            //上に梯子を作れば出口になる
-            //if (field.blocks[field.blocks.length - 1][x] == Collision.Ladder)
-            list.push({ pattern: [[Collision.Ladder]], offsetX: x });
-            //斜め上に足場を作れば出口になる
-            if (field.blocks[field.blocks.length - 1][x - 1] == Collision.Block)
-                list.push({ pattern: [[~Collision.Block, ~Collision.Block]], offsetX: x - 1 });
-            if (field.blocks[field.blocks.length - 1][x + 1] == Collision.Block)
-                list.push({ pattern: [[~Collision.Block, ~Collision.Block]], offsetX: x });
+            points.forEach(x => {
+                //上がブロックでなければ入り口になる
+                list.push({ pattern: [[~Collision.Block]], offsetX: x });
+            });
             return list;
-        }))),
+        }),
+        ...exitList.map(points => {
+            let list: { pattern: number[][], offsetX: number; }[] = [];
+            points.forEach(x => {      
+                //上に梯子を作れば出口になる
+                list.push({ pattern: [[Collision.Ladder]], offsetX: x });
+
+                //隣がブロックなら斜め上に立ち位置を作れば出口になる
+                if (field.blocks[field.blocks.length - 1][x - 1] == Collision.Block)
+                    list.push({ pattern: [[~Collision.Block, ~Collision.Block]], offsetX: x - 1 });
+                if (field.blocks[field.blocks.length - 1][x + 1] == Collision.Block)
+                    list.push({ pattern: [[~Collision.Block, ~Collision.Block]], offsetX: x });
+            });
+            return list;
+        }),
     ].map(x => shuffle(x));
 
     function shuffle<T>(array: T[]): T[] {
         for (let i = 0; i < array.length; i++) {
-            const j = i + Math.floor(Math.random() * (array.length - i))
+            const j = i + Math.floor(Math.random() * (array.length - i));
 
             const t = array[i];
             array[i] = array[j];
