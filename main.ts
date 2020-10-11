@@ -58,6 +58,15 @@ function canEnter(field: Field, x: number, y: number): boolean {
     return field.blocks[y][x] != Collision.Block;
 }
 
+function putCollisionPattern(pendingBlocks: PendingBlock[][], pattern: PendingBlock[][], offsetX: number) {
+    return pendingBlocks.map((row, y) => row.map((a, x) => {
+        const b = pattern[y] !== undefined && pattern[y][x - offsetX] !== undefined ? pattern[y][x - offsetX] : anyCollision;
+        const c = a & b;
+        if (c === 0) throw new Error();
+        return c;
+    }));
+}
+
 function generate(field: Field) {
     //自由にしていいブロックを勝手に決める
     let newLine = field.pendingBlocks.shift().map(pending => {
@@ -92,23 +101,58 @@ function generate(field: Field) {
 
     // 必須の入口出口の候補地を取得
     let [entranceList, exitList] = strengthen(field.graph);
-    // 入口と出口をいい感じに配置する。失敗したら一手戻ってやり直し
-    entranceList.forEach(points => {
-        const point = points[Math.floor(Math.random() * points.length)];
 
-        //上がブロックでなければ入り口になる
-        field.pendingBlocks[0][point] &= ~Collision.Block;
-    });
-    exitList.forEach(points => {
-        const point = points[Math.floor(Math.random() * points.length)];
-        //上に梯子を作れば出口になる
-        if (field.blocks[field.blocks.length - 1][point] == Collision.Ladder)
-            field.pendingBlocks[0][point] &= Collision.Ladder;
-        //斜め上に足場を作れば出口になる
-        else if (1 < point) field.pendingBlocks[0][point - 1] &= ~Collision.Block;
-        else field.pendingBlocks[0][point + 1] &= ~Collision.Block;
-    });
+    // 入り口出口のパターンを列挙（二次元配列の各行から一つずつ選べればOK）
+    let patternList = [
+        ...entranceList.map(points => points.map(x => {
+            //上がブロックでなければ入り口になる
+            return { pattern: [[~Collision.Block]], offsetX: x };
+        })),
+        ...exitList.map(points => ([] as { pattern: number[][], offsetX: number; }[]).concat(...points.map(x => {
+            //上がブロックでなければ入り口になる
+            let list: { pattern: number[][], offsetX: number; }[] = [];
+            //上に梯子を作れば出口になる
+            //if (field.blocks[field.blocks.length - 1][x] == Collision.Ladder)
+            list.push({ pattern: [[Collision.Ladder]], offsetX: x });
+            //斜め上に足場を作れば出口になる
+            if (field.blocks[field.blocks.length - 1][x - 1] == Collision.Block)
+                list.push({ pattern: [[~Collision.Block, ~Collision.Block]], offsetX: x - 1 });
+            if (field.blocks[field.blocks.length - 1][x + 1] == Collision.Block)
+                list.push({ pattern: [[~Collision.Block, ~Collision.Block]], offsetX: x });
+            return list;
+        }))),
+    ].map(x => shuffle(x));
 
+    function shuffle<T>(array: T[]): T[] {
+        for (let i = 0; i < array.length; i++) {
+            const j = i + Math.floor(Math.random() * (array.length - i))
+
+            const t = array[i];
+            array[i] = array[j];
+            array[j] = t;
+        }
+        return array;
+    }
+
+    // 制約パターンから重複しないようにいい感じに選んで設置する
+    function rec(pendingBlocks: PendingBlock[][], patternList: { pattern: number[][], offsetX: number; }[][]): PendingBlock[][] {
+        if (patternList.length === 0) return pendingBlocks;
+        let head = patternList[0];
+        let tail = patternList.slice(1);
+
+        for (let i = 0; i < head.length; i++) {
+            let pendingBlocks2, result;
+            try {
+                pendingBlocks2 = putCollisionPattern(pendingBlocks, head[i].pattern, head[i].offsetX);
+            } catch { continue; }
+            try { result = rec(pendingBlocks2, tail); } catch { continue; }
+            return result;
+        }
+
+        throw new Error();
+    }
+
+    field.pendingBlocks = rec(field.pendingBlocks, patternList);
 
     show(field);
 }
