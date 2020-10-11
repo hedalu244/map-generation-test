@@ -165,13 +165,13 @@ function generate(field) {
         entranceIds[x] = i < 10 ? " " + i : "" + i; }));
     console.log("entrance↓");
     console.log(entranceList);
-    console.log("  " + entranceIds.join(""));
+    console.log(" " + entranceIds.join(""));
     let exitIds = new Array(width).fill("  ");
     exitList.forEach((a, i) => a.forEach(x => { if (canEnter(field, x, field.blocks.length - 1))
         exitIds[x] = i < 10 ? " " + i : "" + i; }));
     console.log("exit↑");
     console.log(exitList);
-    console.log("  " + exitIds.join(""));
+    console.log(" " + exitIds.join(""));
     show(field);
 }
 function show(field) {
@@ -183,7 +183,7 @@ function show(field) {
         }
     }
     console.log("blocks:");
-    [...field.blocks].reverse().forEach(line => console.log("[]" + line.map(collisionToString).join("") + "[]"));
+    [...field.blocks].reverse().forEach(line => console.log(":" + line.map(collisionToString).join("") + ":"));
 }
 // 二つのグラフを合わせたグラフを作る
 function concatGraph(a, b) {
