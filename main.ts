@@ -23,13 +23,14 @@ function mergeSets(a: number, b: number, sets: number[]) {
 }
 
 function Field(): Field {
+    const x = Math.floor(Math.random() * width);
     return {
         blocks: [
             new Array(width).fill(0).map(_ => Collision.Block),
             new Array(width).fill(0).map(_ => Collision.Air),
         ],
         pendingBlocks: [
-            new Array(width).fill(0).map(_ => ~Collision.Block),
+            new Array(width).fill(0).map((_, i) => i == x ? Collision.Ladder : ~Collision.Block),
             new Array(width).fill(0).map(_ => anyCollision),
         ],
         graph: new Array(width).fill(0).map(_ => [])
