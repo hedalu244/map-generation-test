@@ -62,7 +62,7 @@ function canStand(field: Field, x: number, y: number): boolean {
 }
 
 function putCollisionPattern(pendingBlocks: PendingBlock[][], pattern: PendingBlock[][], offsetX: number): PendingBlock[][] | null {
-    let pendingBlocks2 = pendingBlocks.map((row, y) => row.map((a, x) => {
+    const pendingBlocks2 = pendingBlocks.map((row, y) => row.map((a, x) => {
         return a & (pattern[y] !== undefined && pattern[y][x - offsetX] !== undefined ? pattern[y][x - offsetX] : anyCollision);
     }));
     if (pendingBlocks2.some(row=>row.some(p => p == 0))) return null;
@@ -72,8 +72,8 @@ function putCollisionPattern(pendingBlocks: PendingBlock[][], pattern: PendingBl
 
 function generate(field: Field) {
     //自由にしていいブロックを勝手に決める
-    let newLine = field.pendingBlocks.shift().map(pending => {
-        let candidate = (Object.values(Collision).filter(coll => pending & coll));
+    const newLine = field.pendingBlocks.shift().map(pending => {
+        const candidate = (Object.values(Collision).filter(coll => pending & coll));
         return candidate[Math.floor(Math.random() * candidate.length)];
     });
     field.pendingBlocks.push(
@@ -82,7 +82,7 @@ function generate(field: Field) {
 
     // 生成されたblocksに合わせてgraphを更新
     // 後ろに下の段の頂点を追加しておく
-    let newGraph: Graph = concatGraph(new Array(width).fill(0).map(_ => []), field.graph);
+    const newGraph: Graph = concatGraph(new Array(width).fill(0).map(_ => []), field.graph);
     // 上下移動を繋ぐ
     for (let i = 0; i < width; i++) {
         if (!canEnter(field, i, field.blocks.length - 1)) continue;
@@ -105,12 +105,12 @@ function generate(field: Field) {
     field.graph = dropGraph(transclosure(newGraph), width);
 
     // 必須の入口出口の候補地を取得
-    let [entranceList, exitList] = strengthen(field.graph);
+    const [entranceList, exitList] = strengthen(field.graph);
 
     // 入り口出口のパターンを列挙（二次元配列の各行から一つずつ選べればOK）
-    let patternList = [
+    const patternList = [
         ...entranceList.map(points => {
-            let list: { pattern: number[][], offsetX: number; }[] = [];
+            const list: { pattern: number[][], offsetX: number; }[] = [];
             points.forEach(x => {
                 // 立ち入れない点は孤立点だが出口を作る必要はない
                 if (!canEnter(field, x, field.blocks.length - 1)) return;
@@ -120,7 +120,7 @@ function generate(field: Field) {
             return list;
         }),
         ...exitList.map(points => {
-            let list: { pattern: number[][], offsetX: number; }[] = [];
+            const list: { pattern: number[][], offsetX: number; }[] = [];
             points.forEach(x => {
                 // 立ち入れない点は孤立点だが出口を作る必要はない
                 if (!canEnter(field, x, field.blocks.length - 1)) return;
@@ -154,32 +154,32 @@ function generate(field: Field) {
     // 制約パターンから重複しないようにいい感じに選んで設置する
     function rec(pendingBlocks: PendingBlock[][], patternList: { pattern: number[][], offsetX: number; }[][]): PendingBlock[][] | null {
         if (patternList.length === 0) return pendingBlocks;
-        let head = patternList[0];
-        let tail = patternList.slice(1);
+        const head = patternList[0];
+        const tail = patternList.slice(1);
 
         for (let i = 0; i < head.length; i++) {
-            let pendingBlocks2 = putCollisionPattern(pendingBlocks, head[i].pattern, head[i].offsetX);
+            const pendingBlocks2 = putCollisionPattern(pendingBlocks, head[i].pattern, head[i].offsetX);
             if (pendingBlocks2 == null) return null;
-            let result = rec(pendingBlocks2, tail);
+            const result = rec(pendingBlocks2, tail);
             if (result !== null) return result;
         }
 
         return null;
     }
 
-    let pendingBlocks2 = rec(field.pendingBlocks, patternList);
+    const pendingBlocks2 = rec(field.pendingBlocks, patternList);
     if (pendingBlocks2 === null) throw new Error();
     field.pendingBlocks = pendingBlocks2;
 
     console.log(field.graph);
 
-    let entranceIds = new Array(width).fill("  ");
+    const entranceIds = new Array(width).fill("  ");
     entranceList.forEach((a, i) => a.forEach(x => { if (canEnter(field, x, field.blocks.length - 1)) entranceIds[x] = i < 10 ? " " + i : "" + i; }));
     console.log("entrance↓");
     console.log(entranceList);
     console.log(" " + entranceIds.join(""));
 
-    let exitIds = new Array(width).fill("  ");
+    const exitIds = new Array(width).fill("  ");
     exitList.forEach((a, i) => a.forEach(x => { if (canEnter(field, x, field.blocks.length - 1)) exitIds[x] = i < 10 ? " " + i : "" + i; }));
     console.log("exit↑");
     console.log(exitList);
@@ -219,15 +219,14 @@ function dropGraph(graph: Graph, n: number) {
 
 // 推移閉包を作成
 function transclosure(graph: Graph) {
-    let visited: boolean[];
     const newGraph: Graph = new Array(graph.length).fill(0).map(_ => []);
-    function dfs(now: number, root: number) {
+    function dfs(now: number, root: number, visited: boolean[]) {
         if (visited[now]) return;
         visited[now] = true;
         newGraph[root].push(now);
-        graph[now].forEach(x => dfs(x, root));
+        graph[now].forEach(x => dfs(x, root, visited));
     }
-    graph.forEach((v, i) => { visited = new Array(graph.length).fill(false); v.forEach(j => dfs(j, i)); });
+    graph.forEach((v, i) => v.forEach(j => dfs(j, i, new Array(graph.length).fill(false))));
     return newGraph;
 }
 
