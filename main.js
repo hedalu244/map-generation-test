@@ -165,9 +165,9 @@ function generate(field) {
                 list.push({ pattern: [[Collision.Ladder]], offsetX: x });
                 //隣がブロックなら斜め上に立ち位置を作れば出口になる
                 if (field.blocks[field.blocks.length - 1][x - 1] == Collision.Block)
-                    list.push({ pattern: [[~Collision.Block, ~Collision.Block], [~Collision.Block, anyCollision]], offsetX: x - 1 });
+                    list.push({ pattern: [[~Collision.Block, ~Collision.Block], [~Collision.Block, ~Collision.Block]], offsetX: x - 1 });
                 if (field.blocks[field.blocks.length - 1][x + 1] == Collision.Block)
-                    list.push({ pattern: [[~Collision.Block, ~Collision.Block], [anyCollision, ~Collision.Block]], offsetX: x });
+                    list.push({ pattern: [[~Collision.Block, ~Collision.Block], [~Collision.Block, ~Collision.Block, ~Collision.Block]], offsetX: x });
             });
             return list;
         }),
@@ -202,19 +202,25 @@ function generate(field) {
         throw new Error();
     field.pendingBlocks = pendingBlocks2;
     console.log(field.graph);
-    const entranceIds = new Array(width).fill("  ");
-    entranceList.forEach((a, i) => a.forEach(x => { if (canEnter(field, x, field.blocks.length - 1))
-        entranceIds[x] = i < 10 ? " " + i : "" + i; }));
+    const entranceId1 = new Array(width).fill("  ");
+    const entranceId2 = new Array(width).fill("  ");
+    entranceList.forEach((a, i) => a.forEach(x => { entranceId2[x] = i < 10 ? " " + i : "" + i; if (canEnter(field, x, field.blocks.length - 1))
+        entranceId1[x] = i < 10 ? " " + i : "" + i; }));
     console.log("entrance↓");
-    console.log(entranceList);
-    console.log(" " + entranceIds.join(""));
-    const exitIds = new Array(width).fill("  ");
-    exitList.forEach((a, i) => a.forEach(x => { if (canEnter(field, x, field.blocks.length - 1))
-        exitIds[x] = i < 10 ? " " + i : "" + i; }));
+    //console.log(entranceList);
+    console.log(" " + entranceId1.join(""));
+    console.log("(" + entranceId2.join("") + ")");
+    const exitId1 = new Array(width).fill("  ");
+    const exitId2 = new Array(width).fill("  ");
+    exitList.forEach((a, i) => a.forEach(x => { exitId2[x] = i < 10 ? " " + i : "" + i; if (canEnter(field, x, field.blocks.length - 1))
+        exitId1[x] = i < 10 ? " " + i : "" + i; }));
     console.log("exit↑");
-    console.log(exitList);
-    console.log(" " + exitIds.join(""));
+    //console.log(exitList);
+    console.log(" " + exitId1.join(""));
+    console.log("(" + exitId2.join("") + ")");
     show(field);
+    if (exitId1.join("").trim() == "" || entranceId1.join("").trim() == "")
+        throw new Error("no Exit or Entrance");
 }
 function show(field) {
     function collisionToString(coll) {
@@ -249,7 +255,7 @@ function transclosure(graph) {
         graph[now].forEach(x => dfs(x, root, visited));
     }
     graph.forEach((v, i) => v.forEach(j => dfs(j, i, new Array(graph.length).fill(false))));
-    return newGraph;
+    return newGraph.map(x => Array.from(new Set(x)));
 }
 function reverse(graph) {
     const reversed = [];
