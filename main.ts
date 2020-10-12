@@ -109,6 +109,8 @@ function generate(field: Field) {
         if (canGoRight(field, i, field.blocks.length - 1)) newGraph[i].push(i + 1);
         if (canGoLeft(field, i + 1, field.blocks.length - 1)) newGraph[i + 1].push(i);
 
+        if (canGoRight(field, i, field.blocks.length - 2)) newGraph[i + width].push(i + 1 + width);
+        if (canGoLeft(field, i + 1, field.blocks.length - 2)) newGraph[i + 1 + width].push(i + width);
 
         if (canGoRightUp(field, i, field.blocks.length - 2)) newGraph[i + width].push(i + 1);
         if (canGoLeftUp(field, i + 1, field.blocks.length - 2)) newGraph[i + 1 + width].push(i);
