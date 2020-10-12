@@ -29,7 +29,8 @@ function Field(): Field {
             new Array(width).fill(0).map(_ => Collision.Block)
         ],
         pendingBlocks: [
-            new Array(width).fill(0).map(_ => anyCollision)
+            new Array(width).fill(0).map(_ => anyCollision),
+            new Array(width).fill(0).map(_ => anyCollision),
         ],
         graph: new Array(width).fill(0).map(_ => [])
     };
@@ -37,10 +38,10 @@ function Field(): Field {
 
 
 function canGoUp(field: Field, x: number, y: number): boolean {
-    return canEnter(field, x, y) && canStand(field, x, y) && field.blocks[y + 1][x] == Collision.Ladder;
+    return canEnter(field, x, y) && canStand(field, x, y) && canStand(field, x, y + 1);
 }
 function canGoDown(field: Field, x: number, y: number): boolean {
-    return canEnter(field, x, y) && field.blocks[y - 1][x] != Collision.Block;
+    return canEnter(field, x, y) && canEnter(field, x, y - 1);
 }
 function canGoLeft(field: Field, x: number, y: number): boolean {
     return canEnter(field, x, y) && canStand(field, x, y) && canEnter(field, x - 1, y);
@@ -55,10 +56,12 @@ function canGoRightUp(field: Field, x: number, y: number): boolean {
     return canEnter(field, x, y) && canStand(field, x, y) && field.blocks[y][x + 1] == Collision.Block && canEnter(field, x, y + 1) && canEnter(field, x + 1, y + 1);
 }
 function canEnter(field: Field, x: number, y: number): boolean {
-    return field.blocks[y][x] != Collision.Block;
+    if (y == field.blocks.length - 1)
+        return field.blocks[y][x] !== Collision.Block && (field.pendingBlocks[0][x] & Collision.Block) === 0;
+    return field.blocks[y][x] !== Collision.Block && field.blocks[y + 1][x] !== Collision.Block;
 }
 function canStand(field: Field, x: number, y: number): boolean {
-    return (field.blocks[y - 1][x] == Collision.Block || field.blocks[y][x] == Collision.Ladder);
+    return canEnter(field, x, y) && (field.blocks[y - 1][x] == Collision.Block || field.blocks[y][x] == Collision.Ladder);
 }
 
 function putCollisionPattern(pendingBlocks: PendingBlock[][], pattern: PendingBlock[][], offsetX: number): PendingBlock[][] | null {
@@ -79,6 +82,19 @@ function generate(field: Field) {
     field.pendingBlocks.push(
         new Array(width).fill(0).map((_, i) => anyCollision));
     field.blocks.push(newLine);
+
+    // 足場の上は高確率で高さ2のスペースを確保
+    for (let x = 0; x < width; x++) {
+        // ブロックの上にブロックでないマスがあったらその上は高確率でブロックでない
+        if (field.blocks[field.blocks.length - 2][x] === Collision.Block &&
+            field.blocks[field.blocks.length - 1][x] !== Collision.Block && 
+            Math.random() < 0.9)
+            field.pendingBlocks[0][x] &= ~Collision.Block;
+
+        // 梯子があったらその上は必ずブロックでない
+        if (field.blocks[field.blocks.length - 1][x] === Collision.Ladder)
+            field.pendingBlocks[0][x] &= ~Collision.Block;
+    }
 
     // 生成されたblocksに合わせてgraphを更新
     // 後ろに下の段の頂点を追加しておく
@@ -114,8 +130,8 @@ function generate(field: Field) {
             points.forEach(x => {
                 // 立ち入れない点は孤立点だが出口を作る必要はない
                 if (!canEnter(field, x, field.blocks.length - 1)) return;
-                //上がブロックでなければ入り口になる
-                list.push({ pattern: [[~Collision.Block]], offsetX: x });
+                //上2個がブロックでなければ入り口になる
+                list.push({ pattern: [[~Collision.Block], [~Collision.Block]], offsetX: x });
             });
             return list;
         }),
@@ -132,9 +148,9 @@ function generate(field: Field) {
 
                 //隣がブロックなら斜め上に立ち位置を作れば出口になる
                 if (field.blocks[field.blocks.length - 1][x - 1] == Collision.Block)
-                    list.push({ pattern: [[~Collision.Block, ~Collision.Block]], offsetX: x - 1 });
+                    list.push({ pattern: [[~Collision.Block, ~Collision.Block], [~Collision.Block, anyCollision]], offsetX: x - 1 });
                 if (field.blocks[field.blocks.length - 1][x + 1] == Collision.Block)
-                    list.push({ pattern: [[~Collision.Block, ~Collision.Block]], offsetX: x });
+                    list.push({ pattern: [[~Collision.Block, ~Collision.Block], [anyCollision, ~Collision.Block]], offsetX: x });
             });
             return list;
         }),
