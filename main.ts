@@ -41,7 +41,7 @@ function canGoUp(field: Field, x: number, y: number): boolean {
     return canEnter(field, x, y) && canStand(field, x, y) && canStand(field, x, y + 1);
 }
 function canGoDown(field: Field, x: number, y: number): boolean {
-    return canEnter(field, x, y) && canEnter(field, x, y - 1);
+    return field.blocks[y][x] !== Collision.Block && canEnter(field, x, y - 1);
 }
 function canGoLeft(field: Field, x: number, y: number): boolean {
     return canEnter(field, x, y) && canStand(field, x, y) && canEnter(field, x - 1, y);
@@ -107,7 +107,7 @@ function generate(field: Field) {
     const newGraph: Graph = concatGraph(new Array(width).fill(0).map(_ => []), field.graph);
     // 上下移動を繋ぐ
     for (let i = 0; i < width; i++) {
-        if (canGoUp(field, i, field.blocks.length - 2) || !canStand(field, i, field.blocks.length - 1)) newGraph[i + width].push(i);
+        if (canGoUp(field, i, field.blocks.length - 2) || field.blocks[field.blocks.length - 1][i] == Collision.Air) newGraph[i + width].push(i);
         if (canGoDown(field, i, field.blocks.length - 1)) newGraph[i].push(i + width);
     }
     // 左右、斜め移動を繋ぐ
