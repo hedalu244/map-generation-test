@@ -11,10 +11,10 @@ function Field() {
     return {
         blocks: [
             new Array(width).fill(0).map(_ => Collision.Block),
-            new Array(width).fill(0).map(_ => Collision.Block)
+            new Array(width).fill(0).map(_ => Collision.Air),
         ],
         pendingBlocks: [
-            new Array(width).fill(0).map(_ => anyCollision),
+            new Array(width).fill(0).map(_ => ~Collision.Block),
             new Array(width).fill(0).map(_ => anyCollision),
         ],
         graph: new Array(width).fill(0).map(_ => [])
@@ -62,7 +62,7 @@ function generate(field) {
     });
     field.pendingBlocks.push(new Array(width).fill(0).map((_, i) => anyCollision));
     field.blocks.push(newLine);
-    // 足場の上は高確率で高さ2のスペースを確保
+    // 足場の上は高確率で高さ2のスペースを確保、など都合のいい設定
     for (let x = 0; x < width; x++) {
         // ブロックの上にブロックでないマスがあったらその上は高確率でブロックでない
         if (field.blocks[field.blocks.length - 2][x] === Collision.Block &&
@@ -72,6 +72,10 @@ function generate(field) {
         // 梯子があったらその上は必ずブロックでない
         if (field.blocks[field.blocks.length - 1][x] === Collision.Ladder)
             field.pendingBlocks[0][x] &= ~Collision.Block;
+        // 長さ1の梯子を生成しない
+        if (field.blocks[field.blocks.length - 1][x] === Collision.Ladder &&
+            field.blocks[field.blocks.length - 2][x] !== Collision.Ladder)
+            field.pendingBlocks[0][x] &= Collision.Ladder;
     }
     // 生成されたblocksに合わせてgraphを更新
     // 後ろに下の段の頂点を追加しておく
@@ -89,6 +93,7 @@ function generate(field) {
             newGraph[i].push(i + 1);
         if (canGoLeft(field, i + 1, field.blocks.length - 1))
             newGraph[i + 1].push(i);
+        //　前の行では未確定だった左右移動があるかもしれないので追加
         if (canGoRight(field, i, field.blocks.length - 2))
             newGraph[i + width].push(i + 1 + width);
         if (canGoLeft(field, i + 1, field.blocks.length - 2))
