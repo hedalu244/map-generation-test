@@ -68,27 +68,60 @@ function putCollisionPattern(pendingBlocks: PendingBlock[][], pattern: PendingBl
     const pendingBlocks2 = pendingBlocks.map((row, y) => row.map((a, x) => {
         return a & (pattern[y] !== undefined && pattern[y][x - offsetX] !== undefined ? pattern[y][x - offsetX] : anyCollision);
     }));
-    if (pendingBlocks2.some(row=>row.some(p => p == 0))) return null;
+    if (pendingBlocks2.some(row => row.some(p => p == 0))) return null;
 
     return pendingBlocks2;
 }
 
 function generate(field: Field) {
-    //自由にしていいブロックを勝手に決める
-    const newLine = field.pendingBlocks.shift().map(pending => {
-        const candidate = (Object.values(Collision).filter(coll => pending & coll));
-        return candidate[Math.floor(Math.random() * candidate.length)];
+    const newRow: Collision[] = new Array(width);
+
+    // とりあえず確定してるところを置く
+    field.pendingBlocks[0].forEach((pending, x) => {
+        if (pending == Collision.Air) newRow[x] = Collision.Air;
+        if (pending == Collision.Block) newRow[x] = Collision.Block;
+        if (pending == Collision.Ladder) newRow[x] = Collision.Ladder;
     });
 
+    // 自由にしていいブロックを勝手に決める。
+    // 左右の対称性を保つために決定順をシャッフルする。
+    shuffle(new Array(width).fill(0).map((_, i) => i)).forEach(x => {
+        const pending = field.pendingBlocks[0][x];
+        if (pending == Collision.Air ||
+            pending == Collision.Block ||
+            pending == Collision.Ladder) return;
+
+        const candidate: Collision[] = [];
+
+        if ((pending & Collision.Air) !== 0) {
+            // 梯子を相対的に少なくしたい
+            candidate.push(Collision.Air, Collision.Air, Collision.Air);
+        }
+        if ((pending & Collision.Block) !== 0) {
+            // 梯子を相対的に少なくしたい
+            candidate.push(Collision.Block, Collision.Block);
+            // ブロックの左右隣接を好む
+            if (newRow[x - 1] === Collision.Block || newRow[x + 1] === Collision.Block) candidate.push(Collision.Block, Collision.Block);
+        }
+        // 梯子、特に左右隣り合わせを嫌う
+        if ((pending & Collision.Ladder) !== 0) {
+            if (newRow[x - 1] !== Collision.Ladder && newRow[x + 1] !== Collision.Ladder)
+                candidate.push(Collision.Ladder);
+        }
+
+        newRow[x] = candidate[Math.floor(Math.random() * candidate.length)];
+    });
+    field.blocks.push(newRow);
+
+    field.pendingBlocks.shift();
     field.pendingBlocks.push(
         new Array(width).fill(0).map((_, i) => anyCollision));
-    field.blocks.push(newLine);
 
     // 足場の上は高確率で高さ2のスペースを確保、など都合のいい設定
     for (let x = 0; x < width; x++) {
         // ブロックの上にブロックでないマスがあったらその上は高確率でブロックでない
         if (field.blocks[field.blocks.length - 2][x] === Collision.Block &&
-            field.blocks[field.blocks.length - 1][x] !== Collision.Block && 
+            field.blocks[field.blocks.length - 1][x] !== Collision.Block &&
             Math.random() < 0.9)
             field.pendingBlocks[0][x] &= ~Collision.Block;
 
@@ -97,7 +130,7 @@ function generate(field: Field) {
             field.pendingBlocks[0][x] &= ~Collision.Block;
 
         // 長さ1の梯子を生成しない
-        if (field.blocks[field.blocks.length - 1][x] === Collision.Ladder　&&
+        if (field.blocks[field.blocks.length - 1][x] === Collision.Ladder &&
             field.blocks[field.blocks.length - 2][x] !== Collision.Ladder)
             field.pendingBlocks[0][x] &= Collision.Ladder;
     }

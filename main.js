@@ -55,13 +55,46 @@ function putCollisionPattern(pendingBlocks, pattern, offsetX) {
     return pendingBlocks2;
 }
 function generate(field) {
-    //自由にしていいブロックを勝手に決める
-    const newLine = field.pendingBlocks.shift().map(pending => {
-        const candidate = (Object.values(Collision).filter(coll => pending & coll));
-        return candidate[Math.floor(Math.random() * candidate.length)];
+    const newRow = new Array(width);
+    // とりあえず確定してるところを置く
+    field.pendingBlocks[0].forEach((pending, x) => {
+        if (pending == Collision.Air)
+            newRow[x] = Collision.Air;
+        if (pending == Collision.Block)
+            newRow[x] = Collision.Block;
+        if (pending == Collision.Ladder)
+            newRow[x] = Collision.Ladder;
     });
+    // 自由にしていいブロックを勝手に決める。
+    // 左右の対称性を保つために決定順をシャッフルする。
+    shuffle(new Array(width).fill(0).map((_, i) => i)).forEach(x => {
+        const pending = field.pendingBlocks[0][x];
+        if (pending == Collision.Air ||
+            pending == Collision.Block ||
+            pending == Collision.Ladder)
+            return;
+        const candidate = [];
+        if ((pending & Collision.Air) !== 0) {
+            // 梯子を相対的に少なくしたい
+            candidate.push(Collision.Air, Collision.Air, Collision.Air);
+        }
+        if ((pending & Collision.Block) !== 0) {
+            // 梯子を相対的に少なくしたい
+            candidate.push(Collision.Block, Collision.Block);
+            // ブロックの左右隣接を好む
+            if (newRow[x - 1] === Collision.Block || newRow[x + 1] === Collision.Block)
+                candidate.push(Collision.Block, Collision.Block);
+        }
+        // 梯子、特に左右隣り合わせを嫌う
+        if ((pending & Collision.Ladder) !== 0) {
+            if (newRow[x - 1] !== Collision.Ladder && newRow[x + 1] !== Collision.Ladder)
+                candidate.push(Collision.Ladder);
+        }
+        newRow[x] = candidate[Math.floor(Math.random() * candidate.length)];
+    });
+    field.blocks.push(newRow);
+    field.pendingBlocks.shift();
     field.pendingBlocks.push(new Array(width).fill(0).map((_, i) => anyCollision));
-    field.blocks.push(newLine);
     // 足場の上は高確率で高さ2のスペースを確保、など都合のいい設定
     for (let x = 0; x < width; x++) {
         // ブロックの上にブロックでないマスがあったらその上は高確率でブロックでない
