@@ -44,19 +44,16 @@ function canStand(field, x, y) {
     return (field.blocks[y - 1][x] == Collision.Block || field.blocks[y][x] == Collision.Ladder);
 }
 function putCollisionPattern(pendingBlocks, pattern, offsetX) {
-    return pendingBlocks.map((row, y) => row.map((a, x) => {
-        const b = pattern[y] !== undefined && pattern[y][x - offsetX] !== undefined ? pattern[y][x - offsetX] : anyCollision;
-        const c = a & b;
-        if (c === 0)
-            throw new Error();
-        return c;
+    let pendingBlocks2 = pendingBlocks.map((row, y) => row.map((a, x) => {
+        return a & (pattern[y] !== undefined && pattern[y][x - offsetX] !== undefined ? pattern[y][x - offsetX] : anyCollision);
     }));
+    if (pendingBlocks2.some(row => row.some(p => p == 0)))
+        return null;
+    return pendingBlocks2;
 }
 function generate(field) {
     //自由にしていいブロックを勝手に決める
     let newLine = field.pendingBlocks.shift().map(pending => {
-        if (pending === 0)
-            throw new Error();
         let candidate = (Object.values(Collision).filter(coll => pending & coll));
         return candidate[Math.floor(Math.random() * candidate.length)];
     });
@@ -141,24 +138,19 @@ function generate(field) {
         let head = patternList[0];
         let tail = patternList.slice(1);
         for (let i = 0; i < head.length; i++) {
-            let pendingBlocks2, result;
-            try {
-                pendingBlocks2 = putCollisionPattern(pendingBlocks, head[i].pattern, head[i].offsetX);
-            }
-            catch (_a) {
-                continue;
-            }
-            try {
-                result = rec(pendingBlocks2, tail);
-            }
-            catch (_b) {
-                continue;
-            }
-            return result;
+            let pendingBlocks2 = putCollisionPattern(pendingBlocks, head[i].pattern, head[i].offsetX);
+            if (pendingBlocks2 == null)
+                return null;
+            let result = rec(pendingBlocks2, tail);
+            if (result !== null)
+                return result;
         }
-        throw new Error();
+        return null;
     }
-    field.pendingBlocks = rec(field.pendingBlocks, patternList);
+    let pendingBlocks2 = rec(field.pendingBlocks, patternList);
+    if (pendingBlocks2 === null)
+        throw new Error();
+    field.pendingBlocks = pendingBlocks2;
     console.log(field.graph);
     let entranceIds = new Array(width).fill("  ");
     entranceList.forEach((a, i) => a.forEach(x => { if (canEnter(field, x, field.blocks.length - 1))
