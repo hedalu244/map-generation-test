@@ -101,20 +101,17 @@ function generate(field: Field) {
     const newGraph: Graph = concatGraph(new Array(width).fill(0).map(_ => []), field.graph);
     // 上下移動を繋ぐ
     for (let i = 0; i < width; i++) {
-        if (!canEnter(field, i, field.blocks.length - 1)) continue;
         if (canGoUp(field, i, field.blocks.length - 2) || !canStand(field, i, field.blocks.length - 1)) newGraph[i + width].push(i);
         if (canGoDown(field, i, field.blocks.length - 1)) newGraph[i].push(i + width);
     }
     // 左右、斜め移動を繋ぐ
     for (let i = 0; i < width - 1; i++) {
-        if (canEnter(field, i, field.blocks.length - 1)) {
-            if (canGoRight(field, i, field.blocks.length - 1)) newGraph[i].push(i + 1);
-            if (canGoRightUp(field, i, field.blocks.length - 2)) newGraph[i + width].push(i + 1);
-        }
-        if (canEnter(field, i + 1, field.blocks.length - 1)) {
-            if (canGoLeft(field, i + 1, field.blocks.length - 1)) newGraph[i + 1].push(i);
-            if (canGoLeftUp(field, i + 1, field.blocks.length - 2)) newGraph[i + 1 + width].push(i);
-        }
+        if (canGoRight(field, i, field.blocks.length - 1)) newGraph[i].push(i + 1);
+        if (canGoLeft(field, i + 1, field.blocks.length - 1)) newGraph[i + 1].push(i);
+
+
+        if (canGoRightUp(field, i, field.blocks.length - 2)) newGraph[i + width].push(i + 1);
+        if (canGoLeftUp(field, i + 1, field.blocks.length - 2)) newGraph[i + 1 + width].push(i);
     }
 
     // 推移閉包を取った上で、後ろに入れておいた古い頂点を落とす
