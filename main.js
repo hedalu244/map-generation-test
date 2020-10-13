@@ -25,7 +25,7 @@ function canGoUp(field, x, y) {
     return canEnter(field, x, y) && canStand(field, x, y) && canStand(field, x, y + 1);
 }
 function canGoDown(field, x, y) {
-    return field.blocks[y][x] !== Collision.Block && canEnter(field, x, y - 1);
+    return canEnter(field, x, y) && canEnter(field, x, y - 1);
 }
 function canGoLeft(field, x, y) {
     return canEnter(field, x, y) && canStand(field, x, y) && canEnter(field, x - 1, y);
@@ -116,7 +116,7 @@ function generate(field) {
     const newGraph = concatGraph(new Array(width).fill(0).map(_ => []), field.graph);
     // 上下移動を繋ぐ
     for (let i = 0; i < width; i++) {
-        if (canGoUp(field, i, field.blocks.length - 2) || field.blocks[field.blocks.length - 1][i] == Collision.Air)
+        if (canGoUp(field, i, field.blocks.length - 2) /* || field.blocks[field.blocks.length - 1][i] == Collision.Air*/)
             newGraph[i + width].push(i);
         if (canGoDown(field, i, field.blocks.length - 1))
             newGraph[i].push(i + width);
