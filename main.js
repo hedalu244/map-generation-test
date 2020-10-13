@@ -1,12 +1,91 @@
 "use strict";
+// 配列をシャッフルした配列を返す
+function shuffle(array) {
+    const array2 = [...array];
+    for (let i = 0; i < array2.length; i++) {
+        const j = i + Math.floor(Math.random() * (array2.length - i));
+        const t = array2[i];
+        array2[i] = array2[j];
+        array2[j] = t;
+    }
+    return array2;
+}
+// 二つのグラフを合わせたグラフを作る
+function concatGraph(a, b) {
+    const newGraph = new Array(a.length + b.length).fill(0).map(_ => []);
+    a.forEach((v, from) => v.forEach(to => newGraph[from].push(to)));
+    b.forEach((v, from) => v.forEach(to => newGraph[from + a.length].push(to + a.length)));
+    return newGraph;
+}
+// n 以降の頂点とそれにつながる辺を削除する
+function dropGraph(graph, n) {
+    return graph.slice(0, n).map(v => v.filter(to => to < n));
+}
+// 推移閉包を作成
+function transclosure(graph) {
+    const newGraph = new Array(graph.length).fill(0).map(_ => []);
+    function dfs(now, root, visited) {
+        if (visited[now])
+            return;
+        visited[now] = true;
+        newGraph[root].push(now);
+        graph[now].forEach(x => dfs(x, root, visited));
+    }
+    graph.forEach((v, i) => v.forEach(j => dfs(j, i, new Array(graph.length).fill(false))));
+    return newGraph.map(x => Array.from(new Set(x)));
+}
+// 辺の向きをすべて逆転したグラフを得る
+function reverse(graph) {
+    const reversed = [];
+    graph.forEach((vertex) => {
+        reversed.push([]);
+    });
+    graph.forEach((vertex, i) => {
+        vertex.forEach(j => reversed[j].push(i));
+    });
+    return reversed;
+}
+// 強連結成分分解
+function strongComponents(graph) {
+    const reversed = reverse(graph);
+    // dfs1で到達したら1、dfs2も到達したら2、いずれも未到達なら0
+    const visited = new Array(graph.length).fill(0);
+    // component[i] = i番目の頂点が属する強連結成分の番号
+    const component = new Array(graph.length);
+    let componentCount = 0;
+    // 連結でないグラフに対応するためにはたぶんここをループする必要がある
+    for (var i = 0; i < graph.length; i++) {
+        if (visited[i] !== 0)
+            continue;
+        // 深さ優先探索 i<j⇒log[i] log[j]間に辺がある
+        const order = [];
+        function dfs1(now) {
+            if (visited[now] !== 0)
+                return;
+            visited[now] = 1;
+            graph[now].forEach(x => dfs1(x));
+            order.unshift(now);
+        }
+        dfs1(i);
+        function dfs2(now) {
+            if (visited[now] !== 1)
+                return;
+            visited[now] = 2;
+            component[now] = componentCount;
+            reversed[now].forEach(x => dfs2(x));
+        }
+        for (var j = 0; j < order.length; j++) {
+            if (visited[order[j]] !== 1)
+                continue;
+            dfs2(order[j]);
+            componentCount++;
+        }
+    }
+    return [component, componentCount];
+}
 const Collision = { Air: 1, Block: 2, Ladder: 4 };
 const anyCollision = Collision.Air | Collision.Block | Collision.Ladder;
 const width = 11;
-function mergeSets(a, b, sets) {
-    for (let i = 0; i < sets.length; i++)
-        if (sets[i] == b)
-            sets[i] = a;
-}
 function Field() {
     const x = Math.floor(Math.random() * width);
     return {
@@ -20,6 +99,26 @@ function Field() {
         ],
         graph: new Array(width).fill(0).map(_ => [])
     };
+}
+function show(field) {
+    function collisionToString(coll) {
+        switch (coll) {
+            case Collision.Air: return "  ";
+            case Collision.Block: return "[]";
+            case Collision.Ladder: return "|=";
+        }
+    }
+    console.log("blocks:");
+    [...field.blocks].reverse().forEach(line => console.log(":" + line.map(collisionToString).join("") + ":"));
+}
+function canEnter(field, x, y) {
+    // 上半身が未確定に突っ込んでいるときは、封じられる可能性がないときにtrue
+    if (y == field.blocks.length - 1)
+        return field.blocks[y][x] !== Collision.Block && (field.pendingBlocks[0][x] & Collision.Block) === 0;
+    return field.blocks[y][x] !== Collision.Block && field.blocks[y + 1][x] !== Collision.Block;
+}
+function canStand(field, x, y) {
+    return canEnter(field, x, y) && (field.blocks[y - 1][x] == Collision.Block || field.blocks[y][x] == Collision.Ladder);
 }
 function canGoUp(field, x, y) {
     return canEnter(field, x, y) && canStand(field, x, y) && canStand(field, x, y + 1);
@@ -38,14 +137,6 @@ function canGoLeftUp(field, x, y) {
 }
 function canGoRightUp(field, x, y) {
     return canEnter(field, x, y) && canStand(field, x, y) && field.blocks[y][x + 1] == Collision.Block && canEnter(field, x, y + 1) && canEnter(field, x + 1, y + 1);
-}
-function canEnter(field, x, y) {
-    if (y == field.blocks.length - 1)
-        return field.blocks[y][x] !== Collision.Block && (field.pendingBlocks[0][x] & Collision.Block) === 0;
-    return field.blocks[y][x] !== Collision.Block && field.blocks[y + 1][x] !== Collision.Block;
-}
-function canStand(field, x, y) {
-    return canEnter(field, x, y) && (field.blocks[y - 1][x] == Collision.Block || field.blocks[y][x] == Collision.Ladder);
 }
 function putCollisionPattern(pendingBlocks, pattern, offsetX) {
     const pendingBlocks2 = pendingBlocks.map((row, y) => row.map((a, x) => {
@@ -93,10 +184,13 @@ function generate(field) {
         }
         newRow[x] = candidate[Math.floor(Math.random() * candidate.length)];
     });
+    // 新しい行を追加
     field.blocks.push(newRow);
     field.pendingBlocks.shift();
-    field.pendingBlocks.push(new Array(width).fill(0).map((_, i) => anyCollision));
-    // 足場の上は高確率で高さ2のスペースを確保、など都合のいい設定
+    if (field.pendingBlocks.length < 2)
+        field.pendingBlocks.push(new Array(width).fill(0).map((_, i) => anyCollision));
+    // ここからは追加した行に合わせて graphを更新したりpendingBlocksに条件を追加したり
+    // 足場の上は高確率で高さ2のスペースを確保、など、列ごとに独立でヒューリスティックな設定
     for (let x = 0; x < width; x++) {
         // ブロックの上にブロックでないマスがあったらその上は高確率でブロックでない
         if (field.blocks[field.blocks.length - 2][x] === Collision.Block &&
@@ -116,7 +210,7 @@ function generate(field) {
     const newGraph = concatGraph(new Array(width).fill(0).map(_ => []), field.graph);
     // 上下移動を繋ぐ
     for (let i = 0; i < width; i++) {
-        if (canGoUp(field, i, field.blocks.length - 2) /* || field.blocks[field.blocks.length - 1][i] == Collision.Air*/)
+        if (canGoUp(field, i, field.blocks.length - 2))
             newGraph[i + width].push(i);
         if (canGoDown(field, i, field.blocks.length - 1))
             newGraph[i].push(i + width);
@@ -139,11 +233,37 @@ function generate(field) {
     }
     // 推移閉包を取った上で、後ろに入れておいた古い頂点を落とす
     field.graph = dropGraph(transclosure(newGraph), width);
-    // 必須の入口出口の候補地を取得
-    const [entranceList, exitList] = strengthen(field.graph);
-    // 入り口出口のパターンを列挙（二次元配列の各行から一つずつ選べればOK）
+    // 強連結成分分解
+    const [component, componentCount] = strongComponents(field.graph);
+    //各辺を見て、各強連結成分にいくつの入り口と出口があるか数える
+    const entranceCount = new Array(componentCount).fill(0);
+    const exitCount = new Array(componentCount).fill(0);
+    field.graph.forEach((v, from) => {
+        v.forEach(to => {
+            if (component[from] !== component[to]) {
+                exitCount[component[from]]++;
+                entranceCount[component[to]]++;
+            }
+        });
+    });
+    const componentsWithoutEntrance = [];
+    const componentsWithoutExit = [];
+    //入り口のない強連結成分、出口のない成分のメンバーを成分ごとに分けてリストアップする
+    for (let i = 0; i < componentCount; i++) {
+        if (exitCount[i] !== 0 && entranceCount[i] !== 0)
+            continue;
+        const members = [];
+        for (let j = 0; j < field.graph.length; j++)
+            if (component[j] === i)
+                members.push(j);
+        if (exitCount[i] === 0)
+            componentsWithoutExit.push([...members]);
+        if (entranceCount[i] === 0)
+            componentsWithoutEntrance.push([...members]);
+    }
+    // 制約パターンの組み合わせを列挙（二次元配列の各行から一つずつ選べればOK）
     const patternList = [
-        ...entranceList.map(points => {
+        ...componentsWithoutEntrance.map(points => {
             const list = [];
             points.forEach(x => {
                 // 立ち入れない点は孤立点だが出口を作る必要はない
@@ -154,12 +274,13 @@ function generate(field) {
             });
             return list;
         }),
-        ...exitList.map(points => {
+        ...componentsWithoutExit.map(points => {
             const list = [];
             points.forEach(x => {
                 // 立ち入れない点は孤立点だが出口を作る必要はない
                 if (!canEnter(field, x, field.blocks.length - 1))
                     return;
+                // 立てない点に出口を作っても手遅れ
                 if (!canStand(field, x, field.blocks.length - 1))
                     return;
                 //上に梯子を作れば出口になる
@@ -173,16 +294,7 @@ function generate(field) {
             return list;
         }),
     ].filter(x => 0 < x.length).map(x => shuffle(x));
-    function shuffle(array) {
-        for (let i = 0; i < array.length; i++) {
-            const j = i + Math.floor(Math.random() * (array.length - i));
-            const t = array[i];
-            array[i] = array[j];
-            array[j] = t;
-        }
-        return array;
-    }
-    // 制約パターンから重複しないようにいい感じに選んで設置する
+    // 制約パターンが矛盾しないような組み合わせを探して設置する（多分どう選んでも矛盾しないけど）
     function rec(pendingBlocks, patternList) {
         if (patternList.length === 0)
             return pendingBlocks;
@@ -202,10 +314,11 @@ function generate(field) {
     if (pendingBlocks2 === null)
         throw new Error();
     field.pendingBlocks = pendingBlocks2;
+    // 以下デバッグ表示
     console.log(field.graph);
     const entranceId1 = new Array(width).fill("  ");
     const entranceId2 = new Array(width).fill("  ");
-    entranceList.forEach((a, i) => a.forEach(x => { entranceId2[x] = i < 10 ? " " + i : "" + i; if (canEnter(field, x, field.blocks.length - 1))
+    componentsWithoutEntrance.forEach((a, i) => a.forEach(x => { entranceId2[x] = i < 10 ? " " + i : "" + i; if (canEnter(field, x, field.blocks.length - 1))
         entranceId1[x] = i < 10 ? " " + i : "" + i; }));
     console.log("entrance↓");
     //console.log(entranceList);
@@ -213,7 +326,7 @@ function generate(field) {
     console.log("(" + entranceId2.join("") + ")");
     const exitId1 = new Array(width).fill("  ");
     const exitId2 = new Array(width).fill("  ");
-    exitList.forEach((a, i) => a.forEach(x => { exitId2[x] = i < 10 ? " " + i : "" + i; if (canEnter(field, x, field.blocks.length - 1))
+    componentsWithoutExit.forEach((a, i) => a.forEach(x => { exitId2[x] = i < 10 ? " " + i : "" + i; if (canEnter(field, x, field.blocks.length - 1))
         exitId1[x] = i < 10 ? " " + i : "" + i; }));
     console.log("exit↑");
     //console.log(exitList);
@@ -222,114 +335,4 @@ function generate(field) {
     show(field);
     if (exitId1.join("").trim() == "" || entranceId1.join("").trim() == "")
         throw new Error("no Exit or Entrance");
-}
-function show(field) {
-    function collisionToString(coll) {
-        switch (coll) {
-            case Collision.Air: return "  ";
-            case Collision.Block: return "[]";
-            case Collision.Ladder: return "|=";
-        }
-    }
-    console.log("blocks:");
-    [...field.blocks].reverse().forEach(line => console.log(":" + line.map(collisionToString).join("") + ":"));
-}
-// 二つのグラフを合わせたグラフを作る
-function concatGraph(a, b) {
-    const newGraph = new Array(a.length + b.length).fill(0).map(_ => []);
-    a.forEach((v, from) => v.forEach(to => newGraph[from].push(to)));
-    b.forEach((v, from) => v.forEach(to => newGraph[from + a.length].push(to + a.length)));
-    return newGraph;
-}
-// n 以降の頂点とそれにつながる辺を削除する
-function dropGraph(graph, n) {
-    return graph.slice(0, n).map(v => v.filter(to => to < n));
-}
-// 推移閉包を作成
-function transclosure(graph) {
-    const newGraph = new Array(graph.length).fill(0).map(_ => []);
-    function dfs(now, root, visited) {
-        if (visited[now])
-            return;
-        visited[now] = true;
-        newGraph[root].push(now);
-        graph[now].forEach(x => dfs(x, root, visited));
-    }
-    graph.forEach((v, i) => v.forEach(j => dfs(j, i, new Array(graph.length).fill(false))));
-    return newGraph.map(x => Array.from(new Set(x)));
-}
-function reverse(graph) {
-    const reversed = [];
-    graph.forEach((vertex) => {
-        reversed.push([]);
-    });
-    graph.forEach((vertex, i) => {
-        vertex.forEach(j => reversed[j].push(i));
-    });
-    return reversed;
-}
-function strongComponents(graph) {
-    const reversed = reverse(graph);
-    const visited = new Array(graph.length).fill(0);
-    const component = new Array(graph.length);
-    let componentCount = 0;
-    //強連結成分分解
-    for (var i = 0; i < graph.length; i++) {
-        if (visited[i] !== 0)
-            continue;
-        const log = [];
-        function dfs1(now) {
-            if (visited[now] !== 0)
-                return;
-            visited[now] = 1;
-            graph[now].forEach(x => dfs1(x));
-            log.unshift(now);
-        }
-        dfs1(i);
-        function dfs2(now) {
-            if (visited[now] !== 1)
-                return;
-            visited[now] = 2;
-            component[now] = componentCount;
-            reversed[now].forEach(x => dfs2(x));
-        }
-        for (var j = 0; j < log.length; j++) {
-            if (visited[log[j]] !== 1)
-                continue;
-            dfs2(log[j]);
-            componentCount++;
-        }
-    }
-    return [component, componentCount];
-}
-// 強連結にするために追加すべき出口と入り口の候補地を教えてくれる
-function strengthen(graph) {
-    const [component, componentCount] = strongComponents(graph);
-    //各辺を見て、各強連結成分にいくつの入り口と出口があるか数える
-    const entranceCount = new Array(componentCount).fill(0);
-    const exitCount = new Array(componentCount).fill(0);
-    graph.forEach((v, from) => {
-        v.forEach(to => {
-            if (component[from] !== component[to]) {
-                exitCount[component[from]]++;
-                entranceCount[component[to]]++;
-            }
-        });
-    });
-    const entranceList = [];
-    const exitList = [];
-    //入り口のない強連結成分、出口のない成分のメンバーを成分ごとに分けてリストアップする
-    for (let i = 0; i < componentCount; i++) {
-        if (exitCount[i] !== 0 && entranceCount[i] !== 0)
-            continue;
-        const members = [];
-        for (let j = 0; j < graph.length; j++)
-            if (component[j] === i)
-                members.push(j);
-        if (exitCount[i] === 0)
-            exitList.push([...members]);
-        if (entranceCount[i] === 0)
-            entranceList.push([...members]);
-    }
-    return [entranceList, exitList];
 }
